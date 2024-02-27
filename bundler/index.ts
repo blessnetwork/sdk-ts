@@ -5,7 +5,7 @@ import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 
 import * as esbuild from 'esbuild'
-import { execSync, spawn } from 'child_process'
+import { execSync } from 'child_process'
 import { existsSync, mkdirSync, unlinkSync } from 'fs'
 import ora from 'ora'
 
@@ -38,7 +38,7 @@ yargs(hideBin(process.argv))
 		},
 		async (argv) => {
 			try {
-				await runBuildCommand(argv.path, argv.outDir)
+				await runBuildCommand(argv.path, argv.outDir, argv.outFile)
 			} catch (error) {
 				console.error('Error:', error)
 			}
@@ -53,7 +53,11 @@ yargs(hideBin(process.argv))
 /**
  *
  */
-async function runBuildCommand(entry: string, outDir: string | undefined) {
+async function runBuildCommand(
+	entry: string,
+	outDir: string | undefined,
+	outFile: string | undefined
+) {
 	// Validate input path
 	if (!existsSync(entry)) {
 		throw new Error(`Entry point file "${entry}" does not exist.`)
@@ -93,7 +97,7 @@ async function runBuildCommand(entry: string, outDir: string | undefined) {
 		execSync(
 			`javy compile ${path.resolve(outPath, 'index.js')} -o ${path.resolve(
 				outPath,
-				'index.wasm'
+				outFile ? outFile : 'index.wasm'
 			)}`
 		)
 		javySpinner.succeed('WASM built successfully.')
