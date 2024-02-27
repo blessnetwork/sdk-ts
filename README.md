@@ -44,3 +44,5 @@ entryMain(async (input: InputProps<Arguments>) => {
 ```
 
 ### How to build
+
+`bls-sdk-ts build ./index.ts -o <outDirectory> -f <outFile>`
