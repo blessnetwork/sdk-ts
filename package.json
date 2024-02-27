@@ -1,8 +1,12 @@
 {
 	"name": "@blockless/sdk-ts",
 	"version": "1.0.0",
-	"main": "dist/index.js",
-	"types": "dist/index.d.ts",
+	"type": "module",
+	"module": "dist/lib/index.js",
+	"types": "dist/lib/index.d.ts",
+	"bin": {
+		"bls-sdk-ts": "dist/bundler/index.js"
+	},
 	"files": [
 		"/dist"
 	],
@@ -12,6 +16,7 @@
 	},
 	"scripts": {
 		"build": "rimraf dist && tsc",
+		"bls-sdk-ts": "tsx cli.ts",
 		"format": "npx @biomejs/biome format . --write",
 		"test": "jest --preset ts-jest --testEnvironment node --verbose"
 	},
@@ -22,5 +27,10 @@
 		"jest": "^29.7.0",
 		"rimraf": "^5.0.5",
 		"typescript": "^5.3.3"
+	},
+	"dependencies": {
+		"esbuild": "^0.20.1",
+		"ora": "^8.0.1",
+		"yargs": "^17.7.2"
 	}
 }
