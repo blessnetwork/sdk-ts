@@ -1,0 +1,10 @@
+{
+  "name": "example-fetch",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "private": true,
+  "scripts": {
+    "build": "node ../../dist/bundler/index.js build ./index.ts",
+    "invoke": "bls-runtime ./build/index.wasm --permission=https://reqres.in"
+  }
+}

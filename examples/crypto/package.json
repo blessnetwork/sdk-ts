@@ -1,0 +1,16 @@
+{
+  "name": "example-crypto",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "private": true,
+  "scripts": {
+    "build": "bls-sdk-ts build ./index.ts",
+    "invoke": "bls-runtime ./build/index.wasm --permission=https://reqres.in"
+  },
+  "dependencies": {
+    "viem": "^2.7.15"
+  },
+  "devDependencies": {
+    "@blockless/sdk-ts": "file:../.."
+  }
+}

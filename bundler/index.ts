@@ -83,7 +83,7 @@ async function runBuildCommand(entry: string, outDir: string | undefined) {
 			format: 'esm',
 			outfile: path.resolve(outPath, 'index.js'),
 			alias: {
-				crypto: './polyfill/crypto.js'
+				crypto: '@blockless/sdk-ts/lib/polyfill/crypto'
 			}
 		})
 		buildSpinner.succeed('JS built successfully.')
