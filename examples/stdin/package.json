@@ -1,16 +1,16 @@
 {
-  "name": "example-crypto",
+  "name": "example-fetch",
   "version": "1.0.0",
   "main": "index.ts",
   "private": true,
   "scripts": {
     "build": "bls-sdk-ts build ./index.ts",
-    "invoke": "bls-runtime ./build/index.wasm"
-  },
-  "dependencies": {
-    "viem": "^2.7.15"
+    "invoke": "echo '{ \"n\": 2, \"v\": \"abc\" }' | bls-runtime-deno build/index.wasm"
   },
   "devDependencies": {
     "@blockless/sdk-ts": "file:../.."
+  },
+  "dependencies": {
+    "ethers": "^6.11.1"
   }
 }

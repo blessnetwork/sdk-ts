@@ -4,7 +4,10 @@
   "main": "index.ts",
   "private": true,
   "scripts": {
-    "build": "node ../../dist/bundler/index.js build ./index.ts",
+    "build": "bls-sdk-ts build ./index.ts",
     "invoke": "bls-runtime ./build/index.wasm --permission=https://reqres.in"
+  },
+  "devDependencies": {
+    "@blockless/sdk-ts": "file:../.."
   }
 }
