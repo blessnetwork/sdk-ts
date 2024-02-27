@@ -16,7 +16,6 @@
 	},
 	"scripts": {
 		"build": "rimraf dist && tsc",
-		"bls-sdk-ts": "tsx cli.ts",
 		"format": "npx @biomejs/biome format . --write",
 		"test": "jest --preset ts-jest --testEnvironment node --verbose"
 	},

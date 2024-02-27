@@ -20,7 +20,7 @@ $ npm i @blockless/sdk-ts
 ## Example of using this SDK.
 
 ```ts
-import { InputProps, entyrMain } from '@blockless/sdk-ts'
+import { InputProps, entryMain } from '@blockless/sdk-ts'
 import { AbiCoder } from 'ethers'
 
 interface Arguments {
@@ -28,7 +28,7 @@ interface Arguments {
 	v: string
 }
 
-entyrMain(async (input: InputProps<Arguments>) => {
+entryMain(async (input: InputProps<Arguments>) => {
 	console.log('\n Example: Stdin')
 
 	if (Object.keys(input.args).length === 0) {
