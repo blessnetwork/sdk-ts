@@ -1,6 +1,6 @@
 # @blockless/sdk-ts
 
-** This sdk is designed to work with Javascript/Typescript. **
+This sdk is designed to work with Javascript/Typescript.
 
 ## The SDK natively supports
 
