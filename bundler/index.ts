@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
+import os from 'os'
+import fs from 'fs'
 import path from 'path'
 import yargs from 'yargs'
+import fetch from 'node-fetch'
+import ngzip from 'node-gzip'
 import { hideBin } from 'yargs/helpers'
 
 import * as esbuild from 'esbuild'
@@ -50,9 +54,62 @@ yargs(hideBin(process.argv))
 	.demandCommand(1)
 	.parse()
 
-/**
- *
- */
+interface SupportedArchitectures {
+	[key: string]: string
+}
+
+async function installJavy(): Promise<void> {
+	const installSpinner = ora('Installing dependencies ...').start()
+
+	try {
+		// Get operating system information
+		const arch = os.arch()
+		const platform = os.platform()
+
+		// Determine the appropriate Javy binary architecture and filename
+		const supportedArchitectures: SupportedArchitectures = {
+			'arm-linux': 'arm-linux',
+			'arm64-linux': 'arm-linux',
+			'x64-linux': 'x86_64-linux',
+			'x64-mac': 'x86_64-macos',
+			'arm64-mac': 'arm-macos'
+		}
+
+		const binArch =
+			platform === 'win32'
+				? 'x86_64-windows'
+				: supportedArchitectures[`${arch}-${platform}`] || 'x86_64-linux' // Default to x86_64-linux if not found
+		const binFilename = `javy-${binArch}`
+
+		// Fetch the latest release information for bls-javy
+		const releasesResponse = await fetch(
+			'https://api.github.com/repos/blocklessnetwork/bls-javy/releases/latest'
+		)
+		const releases = (await releasesResponse.json()) as { tag_name: string } // Type casting
+
+		const latestTag = releases.tag_name
+		const downloadUrl = `https://github.com/blocklessnetwork/bls-javy/releases/download/${latestTag}/${binFilename}-${latestTag}.gz`
+
+		let binPath = path.resolve(os.homedir(), '.bls')
+
+		if (!existsSync(binPath)) {
+			fs.mkdirSync(binPath)
+		}
+
+		const downloadedFile = await fetch(downloadUrl)
+		const pack = await ngzip.ungzip(await downloadedFile.arrayBuffer())
+		fs.writeFileSync(path.resolve(binPath, 'bls-javy'), pack, {
+			mode: '775'
+		})
+
+		installSpinner.succeed('Installation successful.')
+	} catch (error) {
+		installSpinner.fail('Installation failed.')
+		console.error('Error installing Javy:', error)
+		process.exit(1)
+	}
+}
+
 async function runBuildCommand(
 	entry: string,
 	outDir: string | undefined,
@@ -90,17 +147,22 @@ async function runBuildCommand(
 				crypto: '@blockless/sdk-ts/lib/polyfill/crypto'
 			}
 		})
-		buildSpinner.succeed('JS built successfully.')
+		buildSpinner.succeed('JS build successfully.')
+
+		const blsJavyPath = path.resolve(os.homedir(), '.bls', 'bls-javy')
+		if (!existsSync(blsJavyPath)) {
+			await installJavy()
+		}
 
 		// Compile to WebAssembly
 		const javySpinner = ora('Building WASM ...').start()
 		execSync(
-			`javy compile ${path.resolve(outPath, 'index.js')} -o ${path.resolve(
+			`${blsJavyPath} compile ${path.resolve(
 				outPath,
-				outFile ? outFile : 'index.wasm'
-			)}`
+				'index.js'
+			)} -o ${path.resolve(outPath, outFile ? outFile : 'index.wasm')}`
 		)
-		javySpinner.succeed('WASM built successfully.')
+		javySpinner.succeed('WASM build successfully.')
 	} catch (error) {
 		buildSpinner.fail('Build failed.')
 		console.error(error)
