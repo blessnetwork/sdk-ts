@@ -90,7 +90,7 @@ async function installJavy(): Promise<void> {
 		const latestTag = releases.tag_name
 		const downloadUrl = `https://github.com/blocklessnetwork/bls-javy/releases/download/${latestTag}/${binFilename}-${latestTag}.gz`
 
-		let binPath = path.resolve(os.homedir(), '.bls')
+		const binPath = path.resolve(os.homedir(), '.bls')
 
 		if (!existsSync(binPath)) {
 			fs.mkdirSync(binPath)
