@@ -4,11 +4,8 @@
   "main": "index.ts",
   "private": true,
   "scripts": {
-    "build": "bls-sdk-ts build ./index.ts",
+    "build": "../../dist/bundler/index.js build ./index.ts",
     "invoke": "echo '{ \"n\": 2, \"v\": \"abc\" }' | bls-runtime-deno build/index.wasm"
-  },
-  "devDependencies": {
-    "@blockless/sdk-ts": "file:../.."
   },
   "dependencies": {
     "ethers": "^6.11.1"

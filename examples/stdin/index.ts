@@ -1,4 +1,4 @@
-import { InputProps, entryMain } from '@blockless/sdk-ts'
+import { main, readInput } from '../../lib'
 import { AbiCoder } from 'ethers'
 
 interface Arguments {
@@ -6,8 +6,11 @@ interface Arguments {
 	v: string
 }
 
-entryMain(async (input: InputProps<Arguments>) => {
-	console.log('\n Example: Stdin')
+main(async() => {
+	console.log('\nExample: Stdin')
+
+	// Read input arguments
+	const input = readInput<Arguments>()
 
 	if (Object.keys(input.args).length === 0) {
 		console.log('Missing args.')
