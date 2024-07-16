@@ -71,8 +71,8 @@ async function installJavy(): Promise<void> {
 			'arm-linux': 'arm-linux',
 			'arm64-linux': 'arm-linux',
 			'x64-linux': 'x86_64-linux',
-			'x64-mac': 'x86_64-macos',
-			'arm64-mac': 'arm-macos'
+			'x64-darwin': 'x86_64-macos',
+			'arm64-darwin': 'arm-macos'
 		}
 
 		const binArch =
