@@ -71,15 +71,20 @@ async function installJavy(): Promise<void> {
 			'arm-linux': 'arm-linux',
 			'arm64-linux': 'arm-linux',
 			'x64-linux': 'x86_64-linux',
-			'x64-mac': 'x86_64-macos',
-			'arm64-mac': 'arm-macos'
+			'x64-darwin': 'x86_64-macos',
+			'arm64-darwin': 'arm-macos'
 		}
+
+		console.log('platform', platform)
 
 		const binArch =
 			platform === 'win32'
 				? 'x86_64-windows'
 				: supportedArchitectures[`${arch}-${platform}`] || 'x86_64-linux' // Default to x86_64-linux if not found
 		const binFilename = `javy-${binArch}`
+
+		console.log(binArch)
+		console.log(binFilename)
 
 		// Fetch the latest release information for bls-javy
 		const releasesResponse = await fetch(
