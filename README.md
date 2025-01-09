@@ -1,6 +1,12 @@
 # @blockless/sdk-ts
 
-This sdk is designed to work with Javascript/Typescript.
+This sdk is designed to work with Javascript/Typescript and compile for the BLESS Javy WASM Engine. As such this engine does not have full support for Node / Web APIs, but a majority of pure JavaScript will work, including some of those from the `npm` ecosystem.
+
+You don't need to use this SDK directly, it works as a module add on to your current `npm` project, or you can use `blessnet` CLI to initialize a project that uses this SDK.
+
+```bash
+npx blessnet init
+```
 
 ## The SDK natively supports
 
