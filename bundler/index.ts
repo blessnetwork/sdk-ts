@@ -84,12 +84,12 @@ async function installJavy(): Promise<void> {
 
 		// Fetch the latest release information for bls-javy
 		const releasesResponse = await fetch(
-			'https://api.github.com/repos/blocklessnetwork/bls-javy/releases/latest'
+			'https://api.github.com/repos/blessnetwork/bls-javy/releases/latest'
 		)
 		const releases = (await releasesResponse.json()) as { tag_name: string } // Type casting
 
 		const latestTag = releases.tag_name
-		const downloadUrl = `https://github.com/blocklessnetwork/bls-javy/releases/download/${latestTag}/${binFilename}-${latestTag}.gz`
+		const downloadUrl = `https://github.com/blessnetwork/bls-javy/releases/download/${latestTag}/${binFilename}-${latestTag}.gz`
 
 		const binPath = path.resolve(os.homedir(), '.blessnet', 'bin')
 
