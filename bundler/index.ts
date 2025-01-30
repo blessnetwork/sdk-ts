@@ -13,6 +13,10 @@ import { execSync } from 'child_process'
 import { existsSync, mkdirSync, unlinkSync } from 'fs'
 import ora from 'ora'
 
+// Get operating system information
+const arch = os.arch()
+const platform = os.platform()
+
 // Initialize the CLI
 yargs(hideBin(process.argv))
 	.scriptName('bls-sdk-ts')
@@ -62,9 +66,6 @@ async function installJavy(): Promise<void> {
 	const installSpinner = ora('Installing dependencies ...').start()
 
 	try {
-		// Get operating system information
-		const arch = os.arch()
-		const platform = os.platform()
 
 		// Determine the appropriate Javy binary architecture and filename
 		const supportedArchitectures: SupportedArchitectures = {
@@ -90,7 +91,7 @@ async function installJavy(): Promise<void> {
 		const latestTag = releases.tag_name
 		const downloadUrl = `https://github.com/blocklessnetwork/bls-javy/releases/download/${latestTag}/${binFilename}-${latestTag}.gz`
 
-		const binPath = path.resolve(os.homedir(), '.bls')
+		const binPath = path.resolve(os.homedir(), '.blessnet', 'bin')
 
 		if (!existsSync(binPath)) {
 			fs.mkdirSync(binPath)
@@ -98,8 +99,9 @@ async function installJavy(): Promise<void> {
 
 		const downloadedFile = await fetch(downloadUrl)
 		const pack = await ngzip.ungzip(await downloadedFile.arrayBuffer())
-		fs.writeFileSync(path.resolve(binPath, 'bls-javy'), pack, {
-			mode: '775'
+		const binFilePath = path.resolve(binPath, platform === 'win32' ? 'bls-javy.exe' : 'bls-javy')
+		fs.writeFileSync(binFilePath, pack, {
+			mode: platform === 'win32' ? '755' : '775'
 		})
 
 		installSpinner.succeed('Installation successful.')
@@ -148,8 +150,7 @@ async function runBuildCommand(
 			}
 		})
 		buildSpinner.succeed('JS build successfully.')
-
-		const blsJavyPath = path.resolve(os.homedir(), '.bls', 'bls-javy')
+		const blsJavyPath = path.resolve(os.homedir(), '.blessnet', 'bin', platform === 'win32' ? 'bls-javy.exe' : 'bls-javy')
 		if (!existsSync(blsJavyPath)) {
 			await installJavy()
 		}
@@ -157,7 +158,7 @@ async function runBuildCommand(
 		// Compile to WebAssembly
 		const javySpinner = ora('Building WASM ...').start()
 		execSync(
-			`${blsJavyPath} compile ${path.resolve(
+			`${blsJavyPath} build ${path.resolve(
 				outPath,
 				'index.js'
 			)} -o ${path.resolve(outPath, outFile ? outFile : 'index.wasm')}`
