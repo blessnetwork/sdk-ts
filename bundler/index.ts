@@ -159,7 +159,8 @@ async function runBuildCommand(
 
 	// Validate outdir path
 	if (outDir && !existsSync(outDir)) {
-		throw new Error(`Outdir "${outDir}" does not exist.`)
+		console.warn(`⚠️ Outdir "${outDir}" does not exist. Creating it...`)
+		mkdirSync(outDir, { recursive: true })
 	}
 
 	const outPath = outDir ? outDir : path.resolve(path.dirname(entry), 'build')
