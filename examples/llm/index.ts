@@ -1,3 +1,4 @@
+declare const BlessLLM: any;
 
 // Create instance
 const llm = BlessLLM("Llama-3.1-8B-Instruct-q4f32_1-MLC");
