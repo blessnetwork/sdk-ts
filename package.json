@@ -15,7 +15,7 @@
 		"registry": "https://registry.npmjs.org"
 	},
 	"scripts": {
-		"build": "rimraf dist && tsc",
+		"build": "rimraf dist build && tsc",
 		"format": "npx @biomejs/biome format . --write",
 		"test": "jest --preset ts-jest --testEnvironment node --verbose"
 	},
