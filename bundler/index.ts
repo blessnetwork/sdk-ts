@@ -144,10 +144,7 @@ async function runBuildCommand(
 			bundle: true,
 			platform: 'browser',
 			format: 'esm',
-			outfile: path.resolve(outPath, 'index.js'),
-			alias: {
-				crypto: '@blockless/sdk-ts/lib/polyfill/crypto'
-			}
+			outfile: path.resolve(outPath, 'index.js')
 		})
 		buildSpinner.succeed('JS build successfully.')
 		const blsJavyPath = path.resolve(os.homedir(), '.blessnet', 'bin', platform === 'win32' ? 'bls-javy.exe' : 'bls-javy')
@@ -155,15 +152,36 @@ async function runBuildCommand(
 			await installJavy()
 		}
 
+		const blsPluginsDir = path.resolve(os.homedir(), '.blessnet', 'bin', 'plugins')
+		let pluginPaths: string[] = []
+
+		// Check if plugins directory exists
+		if (existsSync(blsPluginsDir)) {
+			// Read all files from plugins directory
+			const pluginFiles = fs.readdirSync(blsPluginsDir)
+			
+			// Filter for .wasm files and create full paths
+			pluginPaths = pluginFiles
+				.filter(file => file.endsWith('.wasm'))
+				.map(file => path.resolve(blsPluginsDir, file))
+		} else {
+			mkdirSync(blsPluginsDir, { recursive: true })
+		}
+
 		// Compile to WebAssembly
 		const javySpinner = ora('Building WASM ...').start()
-		execSync(
-			`${blsJavyPath} build ${path.resolve(
-				outPath,
-				'index.js'
-			)} -o ${path.resolve(outPath, outFile ? outFile : 'index.wasm')}`
-		)
-		javySpinner.succeed('WASM build successfully.')
+		try {
+			const pluginArgs = pluginPaths.map(plugin => `-C plugin=${plugin}`).join(' ')
+			execSync(
+				`${blsJavyPath} build ${pluginArgs} ${path.resolve(
+					outPath,
+					'index.js'
+				)} -o ${path.resolve(outPath, outFile ? outFile : 'index.wasm')}`
+			)
+			javySpinner.succeed('WASM build successfully.')
+		} catch (error) {
+			javySpinner.fail('WASM build failed.')
+		}
 	} catch (error) {
 		buildSpinner.fail('Build failed.')
 		console.error(error)
