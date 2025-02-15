@@ -177,3 +177,6 @@ dist
 examples/**/build
 
 *.log
+
+# Builds
+build/

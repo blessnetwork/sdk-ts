@@ -52,3 +52,9 @@ entryMain(async (input: InputProps<Arguments>) => {
 ### How to build
 
 `bls-sdk-ts build ./index.ts -o <outDirectory> -f <outFile>`
+
+### Building examples locally
+
+```sh
+npm run build && node ./dist/bundler build ./examples/llm/index.ts -o ./build -f llm-example.wasm
+```
