@@ -60,7 +60,20 @@ class WebServer {
 			const { params } = this.matchRoute(route.path, urlPath)
 			route.handler({ params }, { send: (msg: string) => console.log(msg) })
 		} else {
-			console.log('Route not found')
+			// serve index.html or index.htm if the route is '/'
+			if (urlPath === '/' || urlPath === '') {
+				const indexHtml = this.serveStaticFile('/index.html')
+				const indexHtm = this.serveStaticFile('/index.htm')
+				if (indexHtml !== null) {
+					console.log(indexHtml)
+				} else if (indexHtm !== null) {
+					console.log(indexHtm)
+				} else {
+					console.log('Route not found')
+				}
+			} else {
+				console.log('Route not found')
+			}
 		}
 	}
 	public get(path: string, handler: (req: Request, res: Response) => void) {
