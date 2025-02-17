@@ -26,13 +26,11 @@ interface LlmInstance {
     setOptions(options: LlmOptions): void;
     getOptions(): LlmOptions;
     chat(prompt: string): string;
-    MODELS: ModelsInterface;
 }
 
 // Type definition for the BlessLLM constructor
 interface BlessLLMConstructor {
     (model: string): LlmInstance;
-    MODELS: ModelsInterface;
 }
 
 // Declare the global BlessLLM
