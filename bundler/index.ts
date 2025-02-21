@@ -72,9 +72,9 @@ yargs(hideBin(process.argv))
 						return features as SupportedFeature[]
 					}
 				})
-				.option('reinstall', {
+				.option('update', {
 					alias: 'r',
-					describe: 'Force reinstall of Javy and bless plugins',
+					describe: 'Force update of Javy and bless plugins',
 					type: 'boolean',
 					default: false
 				})
@@ -87,7 +87,7 @@ yargs(hideBin(process.argv))
 					argv.outDir,
 					argv.outFile,
 					argv.features || [],
-					argv.reinstall
+					argv.update
 				)
 			} catch (error) {
 				console.error('Error:', error)
@@ -118,13 +118,13 @@ interface SupportedArchitectures {
 
 async function installJavy(
 	javyPath: string,
-	forceReinstall: boolean = false
+	forceUpdate: boolean = false
 ): Promise<void> {
 	if (existsSync(javyPath)) {
-		// Skip installation if already installed and force-reinstall is false
-		if (!forceReinstall) return
+		// Skip installation if already installed and force-update is false
+		if (!forceUpdate) return
 
-		// If force-reinstall is true and file exists, delete it
+		// If force-update is true and file exists, delete it
 		unlinkSync(javyPath)
 	}
 
@@ -177,7 +177,7 @@ async function installJavy(
 async function installJavyBlessPlugins(
 	pluginsPath: string,
 	features: SupportedFeature[],
-	forceReinstall: boolean
+	forceUpdate: boolean
 ): Promise<void> {
 	try {
 		// Fetch release info first to get the tag
@@ -194,15 +194,15 @@ async function installJavyBlessPlugins(
 		const pluginName = `bless-plugins${featuresSuffix}-${latestTag}.wasm`
 		const actualPluginPath = path.join(pluginDir, pluginName)
 
-		// Check if plugin exists and handle reinstall
-		if (existsSync(actualPluginPath) && !forceReinstall) {
+		// Check if plugin exists and handle update
+		if (existsSync(actualPluginPath) && !forceUpdate) {
 			return
 		}
 
 		const installSpinner = ora('Installing Bless plugins ...').start()
 
-		// Remove existing plugin if forcing reinstall
-		if (existsSync(actualPluginPath) && forceReinstall) {
+		// Remove existing plugin if forcing update
+		if (existsSync(actualPluginPath) && forceUpdate) {
 			unlinkSync(actualPluginPath)
 		}
 
@@ -236,7 +236,7 @@ async function runBuildCommand(
 	outDir: string | undefined,
 	outFile: string | undefined,
 	features: SupportedFeature[],
-	reinstall: boolean
+	update: boolean
 ) {
 	// Validate input path
 	if (!existsSync(entry)) {
@@ -270,8 +270,8 @@ async function runBuildCommand(
 		})
 		buildSpinner.succeed('JS build successful.')
 
-		await installJavy(JAVY_PATH, reinstall)
-		await installJavyBlessPlugins(PLUGINS_PATH, features, reinstall)
+		await installJavy(JAVY_PATH, update)
+		await installJavyBlessPlugins(PLUGINS_PATH, features, update)
 
 		let pluginPaths: string[] = []
 		if (existsSync(PLUGINS_DIR)) {

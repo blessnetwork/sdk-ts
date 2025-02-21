@@ -62,10 +62,10 @@ npm run build && node ./dist/bundler build ./examples/llm/index.ts -o ./build -f
 ### Re-install/update Javy and plugins
 
 ```sh
-npm run build && node ./dist/bundler build ./examples/crypto/index.ts -o ./build -f crypto-example.wasm --reinstall
+npm run build && node ./dist/bundler build ./examples/crypto/index.ts -o ./build -f crypto-example.wasm --update
 ```
 
-Note: `--reinstall` will force the re-installation of Javy and the plugins.
+Note: `--update` will force the re-installation of Javy and the plugins - getting the latest versions.
 
 ## Uninstall Javy and plugins
 
