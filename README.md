@@ -49,12 +49,26 @@ entryMain(async (input: InputProps<Arguments>) => {
 })
 ```
 
-### How to build
+## How to build
 
 `bls-sdk-ts build ./index.ts -o <outDirectory> -f <outFile>`
 
 ### Building examples locally
 
 ```sh
-npm run build && node ./dist/bundler build ./examples/llm/index.ts -o ./build -f llm-example.wasm
+npm run build && node ./dist/bundler build ./examples/llm/index.ts -o ./build -f llm-example.wasm --features llm
+```
+
+### Re-install/update Javy and plugins
+
+```sh
+npm run build && node ./dist/bundler build ./examples/crypto/index.ts -o ./build -f crypto-example.wasm --reinstall
+```
+
+Note: `--reinstall` will force the re-installation of Javy and the plugins.
+
+## Uninstall Javy and plugins
+
+```sh
+npm run build && node ./dist/bundler uninstall
 ```
