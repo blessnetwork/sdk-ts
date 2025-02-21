@@ -55,6 +55,8 @@ entryMain(async (input: InputProps<Arguments>) => {
 
 ### Building examples locally
 
+#### Building the LLM example
+
 ```sh
 npm run build && node ./dist/bundler build ./examples/llm/index.ts -o ./build -f llm-example.wasm --features llm
 ```
@@ -62,7 +64,7 @@ npm run build && node ./dist/bundler build ./examples/llm/index.ts -o ./build -f
 ### Re-install/update Javy and plugins
 
 ```sh
-npm run build && node ./dist/bundler build ./examples/crypto/index.ts -o ./build -f crypto-example.wasm --update
+npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build -f fetch-example.wasm --update
 ```
 
 Note: `--update` will force the re-installation of Javy and the plugins - getting the latest versions.
@@ -72,3 +74,12 @@ Note: `--update` will force the re-installation of Javy and the plugins - gettin
 ```sh
 npm run build && node ./dist/bundler uninstall
 ```
+
+## Features
+
+| Feature | Description |
+|---------|------------|
+| `full` | Adds support for all plugins. |
+| `llm` | Adds support for the LLM plugin. |
+| `crypto` | Adds support for the Crypto plugin. |
+| `fetch` | Adds support for the Fetch plugin. |
