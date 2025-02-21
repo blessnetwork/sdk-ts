@@ -17,6 +17,18 @@ import ora from 'ora'
 const arch = os.arch()
 const platform = os.platform()
 
+const BLESSNET_BASE = path.resolve(os.homedir(), '.blessnet')
+const JAVY_PATH = path.resolve(
+	BLESSNET_BASE,
+	'bin',
+	platform === 'win32' ? 'bls-javy.exe' : 'bls-javy'
+)
+const PLUGINS_DIR = path.resolve(BLESSNET_BASE, 'bin', 'plugins')
+const PLUGINS_PATH = path.resolve(PLUGINS_DIR, 'bless-plugins.wasm')
+
+const SUPPORTED_FEATURES = ['llm'] as const
+type SupportedFeature = (typeof SUPPORTED_FEATURES)[number]
+
 // Initialize the CLI
 yargs(hideBin(process.argv))
 	.scriptName('bls-sdk-ts')
@@ -42,11 +54,53 @@ yargs(hideBin(process.argv))
 					type: 'string',
 					default: 'index.wasm'
 				})
+				.option('features', {
+					alias: 'F',
+					describe: `Comma-separated list of features to enable. Supported features: [${SUPPORTED_FEATURES.join(', ')}]`,
+					type: 'string',
+					coerce: (arg: string) => {
+						if (!arg) return []
+						const features = arg.split(',').map((f) => f.trim().toLowerCase())
+						const invalidFeatures = features.filter(
+							(f) => !SUPPORTED_FEATURES.includes(f as SupportedFeature)
+						)
+						if (invalidFeatures.length > 0) {
+							throw new Error(
+								`Unsupported features: ${invalidFeatures.join(', ')}`
+							)
+						}
+						return features as SupportedFeature[]
+					}
+				})
+				.option('reinstall', {
+					alias: 'r',
+					describe: 'Force reinstall of Javy and bless plugins',
+					type: 'boolean',
+					default: false
+				})
 				.group(['out-dir'], 'Options:')
 		},
 		async (argv) => {
 			try {
-				await runBuildCommand(argv.path, argv.outDir, argv.outFile)
+				await runBuildCommand(
+					argv.path,
+					argv.outDir,
+					argv.outFile,
+					argv.features || [],
+					argv.reinstall
+				)
+			} catch (error) {
+				console.error('Error:', error)
+			}
+		}
+	)
+	.command(
+		'uninstall',
+		'Removes Blockless Javy and plugins installation.',
+		() => {},
+		async () => {
+			try {
+				await runUninstallCommand()
 			} catch (error) {
 				console.error('Error:', error)
 			}
@@ -62,11 +116,21 @@ interface SupportedArchitectures {
 	[key: string]: string
 }
 
-async function installJavy(): Promise<void> {
+async function installJavy(
+	javyPath: string,
+	forceReinstall: boolean = false
+): Promise<void> {
+	if (existsSync(javyPath)) {
+		// Skip installation if already installed and force-reinstall is false
+		if (!forceReinstall) return
+
+		// If force-reinstall is true and file exists, delete it
+		unlinkSync(javyPath)
+	}
+
 	const installSpinner = ora('Installing dependencies ...').start()
 
 	try {
-
 		// Determine the appropriate Javy binary architecture and filename
 		const supportedArchitectures: SupportedArchitectures = {
 			'arm-linux': 'arm-linux',
@@ -86,21 +150,19 @@ async function installJavy(): Promise<void> {
 		const releasesResponse = await fetch(
 			'https://api.github.com/repos/blessnetwork/bls-javy/releases/latest'
 		)
-		const releases = (await releasesResponse.json()) as { tag_name: string } // Type casting
+		const releases = (await releasesResponse.json()) as { tag_name: string }
 
 		const latestTag = releases.tag_name
 		const downloadUrl = `https://github.com/blessnetwork/bls-javy/releases/download/${latestTag}/${binFilename}-${latestTag}.gz`
 
-		const binPath = path.resolve(os.homedir(), '.blessnet', 'bin')
-
+		const binPath = path.dirname(javyPath)
 		if (!existsSync(binPath)) {
-			fs.mkdirSync(binPath)
+			fs.mkdirSync(binPath, { recursive: true })
 		}
 
 		const downloadedFile = await fetch(downloadUrl)
 		const pack = await ngzip.ungzip(await downloadedFile.arrayBuffer())
-		const binFilePath = path.resolve(binPath, platform === 'win32' ? 'bls-javy.exe' : 'bls-javy')
-		fs.writeFileSync(binFilePath, pack, {
+		fs.writeFileSync(javyPath, pack, {
 			mode: platform === 'win32' ? '755' : '775'
 		})
 
@@ -112,45 +174,69 @@ async function installJavy(): Promise<void> {
 	}
 }
 
-async function installJavyBlessPlugins(): Promise<void> {
-  const installSpinner = ora('Installing Bless plugins ...').start()
+async function installJavyBlessPlugins(
+	pluginsPath: string,
+	features: SupportedFeature[],
+	forceReinstall: boolean
+): Promise<void> {
+	try {
+		// Fetch release info first to get the tag
+		const releasesResponse = await fetch(
+			'https://api.github.com/repos/blessnetwork/javy-bless-plugins/releases/latest'
+		)
+		const releases = (await releasesResponse.json()) as { tag_name: string }
+		const latestTag = releases.tag_name
 
-  try {
-    // Fetch the latest release information for javy-bless-plugins
-    const releasesResponse = await fetch(
-      'https://api.github.com/repos/blessnetwork/javy-bless-plugins/releases/latest'
-    )
-    const releases = (await releasesResponse.json()) as { tag_name: string }
+		// Construct expected plugin name based on features
+		const pluginDir = path.dirname(pluginsPath)
+		const featuresSuffix =
+			features.length > 0 ? `-${features.sort().join('-')}` : ''
+		const pluginName = `bless-plugins${featuresSuffix}-${latestTag}.wasm`
+		const actualPluginPath = path.join(pluginDir, pluginName)
 
-    const latestTag = releases.tag_name
-    const pluginUrl = `https://github.com/blessnetwork/javy-bless-plugins/releases/download/${latestTag}/bless-plugins-${latestTag}.wasm`
+		// Check if plugin exists and handle reinstall
+		if (existsSync(actualPluginPath) && !forceReinstall) {
+			return
+		}
 
-    const binPath = path.resolve(os.homedir(), '.blessnet', 'bin', 'plugins')
+		const installSpinner = ora('Installing Bless plugins ...').start()
 
-    if (!existsSync(binPath)) {
-      fs.mkdirSync(binPath)
-    }
+		// Remove existing plugin if forcing reinstall
+		if (existsSync(actualPluginPath) && forceReinstall) {
+			unlinkSync(actualPluginPath)
+		}
 
-    const downloadedFile = await fetch(pluginUrl)
-    if (!downloadedFile.ok) {
-      throw new Error(`Failed to download plugin: ${downloadedFile.statusText}`)
-    }
+		// Download and install the plugin
+		const pluginUrl = `https://github.com/blessnetwork/javy-bless-plugins/releases/download/${latestTag}/${pluginName}`
 
-    const pluginBuffer = await downloadedFile.arrayBuffer()
-    fs.writeFileSync(path.resolve(binPath, 'bless-plugins.wasm'), Buffer.from(pluginBuffer))
+		if (!existsSync(pluginDir)) {
+			fs.mkdirSync(pluginDir, { recursive: true })
+		}
 
-    installSpinner.succeed('Plugins installation successful.')
-  } catch (error) {
-    installSpinner.fail('Plugins installation failed.')
-    console.error('Error installing Bless plugins:', error)
-    process.exit(1)
-  }
+		const downloadedFile = await fetch(pluginUrl)
+		if (!downloadedFile.ok) {
+			throw new Error(`Failed to download plugin: ${downloadedFile.statusText}`)
+		}
+
+		const pluginBuffer = await downloadedFile.arrayBuffer()
+		fs.writeFileSync(actualPluginPath, Buffer.from(pluginBuffer))
+
+		installSpinner.succeed(
+			`Plugins installation successful (${features.length ? `features: ${features.join(', ')}` : 'no features'})`
+		)
+	} catch (error) {
+		// installSpinner.fail('Plugins installation failed.')
+		console.error('Error installing Bless plugins:', error)
+		process.exit(1)
+	}
 }
 
 async function runBuildCommand(
 	entry: string,
 	outDir: string | undefined,
-	outFile: string | undefined
+	outFile: string | undefined,
+	features: SupportedFeature[],
+	reinstall: boolean
 ) {
 	// Validate input path
 	if (!existsSync(entry)) {
@@ -183,45 +269,28 @@ async function runBuildCommand(
 			outfile: path.resolve(outPath, 'index.js')
 		})
 		buildSpinner.succeed('JS build successful.')
-		const blsJavyPath = path.resolve(os.homedir(), '.blessnet', 'bin', platform === 'win32' ? 'bls-javy.exe' : 'bls-javy')
-		if (!existsSync(blsJavyPath)) {
-			await installJavy()
-		}
 
-		const blsPluginsDir = path.resolve(os.homedir(), '.blessnet', 'bin', 'plugins')
+		await installJavy(JAVY_PATH, reinstall)
+		await installJavyBlessPlugins(PLUGINS_PATH, features, reinstall)
+
 		let pluginPaths: string[] = []
-
-		// Check if plugins directory exists
-		if (!existsSync(blsPluginsDir)) {
-			mkdirSync(blsPluginsDir, { recursive: true })
-		}
-
-		// Check if plugin exists
-		const blsPluginPath = path.resolve(os.homedir(), '.blessnet', 'bin', 'plugins', 'bless-plugins.wasm')
-		if (!existsSync(blsPluginPath)) {
-			await installJavyBlessPlugins()
-		}
-
-		// Read all plugins from plugins directory
-		if (existsSync(blsPluginsDir)) {
-			const pluginFiles = fs.readdirSync(blsPluginsDir)
-			
-			// Filter for .wasm files and create full paths
+		if (existsSync(PLUGINS_DIR)) {
+			const pluginFiles = fs.readdirSync(PLUGINS_DIR)
 			pluginPaths = pluginFiles
-				.filter(file => file.endsWith('.wasm'))
-				.map(file => path.resolve(blsPluginsDir, file))
-		} else {
-			mkdirSync(blsPluginsDir, { recursive: true })
+				.filter((file) => file.endsWith('.wasm'))
+				.map((file) => path.resolve(PLUGINS_DIR, file))
 		}
 
 		// Compile to WebAssembly
 		const pluginSpinner = ora('Loading WASM plugins ...').start()
 		const javySpinner = ora('Building WASM ...').start()
 		try {
-			const pluginArgs = pluginPaths.map(plugin => `-C plugin=${plugin}`).join(' ')
+			const pluginArgs = pluginPaths
+				.map((plugin) => `-C plugin=${plugin}`)
+				.join(' ')
 			pluginSpinner.succeed(`WASM plugins loaded [${pluginPaths.length}]`)
 			execSync(
-				`${blsJavyPath} build ${pluginArgs} ${path.resolve(
+				`${JAVY_PATH} build ${pluginArgs} ${path.resolve(
 					outPath,
 					'index.js'
 				)} -o ${path.resolve(outPath, outFile ? outFile : 'index.wasm')}`
@@ -237,7 +306,7 @@ async function runBuildCommand(
 
 	// Clean Up: Delete index.js file
 	const cleanupSpinner = ora('Cleaning up ...').start()
-	const indexPath = path.join(outPath, 'index.js') // Use path.join for consistency
+	const indexPath = path.join(outPath, 'index.js')
 
 	if (existsSync(indexPath)) {
 		unlinkSync(indexPath)
@@ -248,4 +317,38 @@ async function runBuildCommand(
 
 	// New line
 	console.log('\n')
+}
+
+async function runUninstallCommand(): Promise<void> {
+	const uninstallSpinner = ora('Uninstalling Blockless components...').start()
+
+	try {
+		// Remove Javy binary
+		if (existsSync(JAVY_PATH)) {
+			unlinkSync(JAVY_PATH)
+			console.log(`✓ Removed Javy binary: ${JAVY_PATH}`)
+		}
+
+		// Remove plugins directory
+		if (existsSync(PLUGINS_DIR)) {
+			fs.rmSync(PLUGINS_DIR, { recursive: true, force: true })
+			console.log(`✓ Removed plugins directory: ${PLUGINS_DIR}`)
+		}
+
+		// Attempt to remove bin directory if empty
+		const binDir = path.dirname(JAVY_PATH)
+		if (existsSync(binDir)) {
+			const remainingFiles = fs.readdirSync(binDir)
+			if (remainingFiles.length === 0) {
+				fs.rmdirSync(binDir)
+				console.log(`✓ Removed empty bin directory: ${binDir}`)
+			}
+		}
+
+		uninstallSpinner.succeed('Uninstallation completed successfully.')
+	} catch (error) {
+		uninstallSpinner.fail('Uninstallation failed.')
+		console.error('Error during uninstallation:', error)
+		process.exit(1)
+	}
 }
