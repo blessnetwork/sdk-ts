@@ -24,9 +24,8 @@ const JAVY_PATH = path.resolve(
 	platform === 'win32' ? 'bls-javy.exe' : 'bls-javy'
 )
 const PLUGINS_DIR = path.resolve(BLESSNET_BASE, 'bin', 'plugins')
-const PLUGINS_PATH = path.resolve(PLUGINS_DIR, 'bless-plugins.wasm')
 
-const SUPPORTED_FEATURES = ['llm'] as const
+const SUPPORTED_FEATURES = ['full', 'llm', 'crypto', 'fetch'] as const
 type SupportedFeature = (typeof SUPPORTED_FEATURES)[number]
 
 // Initialize the CLI
@@ -175,57 +174,50 @@ async function installJavy(
 }
 
 async function installJavyBlessPlugins(
-	pluginsPath: string,
+	pluginsDir: string,
 	features: SupportedFeature[],
 	forceUpdate: boolean
-): Promise<void> {
+): Promise<string[]> {
 	try {
-		// Fetch release info first to get the tag
-		const releasesResponse = await fetch(
+		const { tag_name: latestTag } = await fetch(
 			'https://api.github.com/repos/blessnetwork/javy-bless-plugins/releases/latest'
-		)
-		const releases = (await releasesResponse.json()) as { tag_name: string }
-		const latestTag = releases.tag_name
+		).then((res) => res.json() as Promise<{ tag_name: string }>)
 
-		// Construct expected plugin name based on features
-		const pluginDir = path.dirname(pluginsPath)
-		const featuresSuffix =
-			features.length > 0 ? `-${features.sort().join('-')}` : ''
-		const pluginName = `bless-plugins${featuresSuffix}-${latestTag}.wasm`
-		const actualPluginPath = path.join(pluginDir, pluginName)
-
-		// Check if plugin exists and handle update
-		if (existsSync(actualPluginPath) && !forceUpdate) {
-			return
+		if (!existsSync(pluginsDir)) {
+			fs.mkdirSync(pluginsDir, { recursive: true })
 		}
 
 		const installSpinner = ora('Installing Bless plugins ...').start()
+		const pluginsToInstall = features.length === 0 ? [''] : features
+		const installedPlugins: string[] = []
 
-		// Remove existing plugin if forcing update
-		if (existsSync(actualPluginPath) && forceUpdate) {
-			unlinkSync(actualPluginPath)
+		for (const feature of pluginsToInstall) {
+			const pluginName = feature
+				? `bless-plugins-${feature}-${latestTag}.wasm`
+				: `bless-plugins-${latestTag}.wasm`
+			const pluginPath = path.join(pluginsDir, pluginName)
+			const pluginUrl = `https://github.com/blessnetwork/javy-bless-plugins/releases/download/${latestTag}/${pluginName}`
+
+			if (!existsSync(pluginPath) || forceUpdate) {
+				if (existsSync(pluginPath)) unlinkSync(pluginPath)
+
+				const response = await fetch(pluginUrl)
+				if (!response.ok) {
+					throw new Error(
+						`Failed to download ${feature || 'default'} plugin: ${response.statusText}`
+					)
+				}
+
+				fs.writeFileSync(pluginPath, Buffer.from(await response.arrayBuffer()))
+			}
+			installedPlugins.push(pluginPath)
 		}
-
-		// Download and install the plugin
-		const pluginUrl = `https://github.com/blessnetwork/javy-bless-plugins/releases/download/${latestTag}/${pluginName}`
-
-		if (!existsSync(pluginDir)) {
-			fs.mkdirSync(pluginDir, { recursive: true })
-		}
-
-		const downloadedFile = await fetch(pluginUrl)
-		if (!downloadedFile.ok) {
-			throw new Error(`Failed to download plugin: ${downloadedFile.statusText}`)
-		}
-
-		const pluginBuffer = await downloadedFile.arrayBuffer()
-		fs.writeFileSync(actualPluginPath, Buffer.from(pluginBuffer))
 
 		installSpinner.succeed(
-			`Plugins installation successful (${features.length ? `features: ${features.join(', ')}` : 'no features'})`
+			`Plugins installation successful (${features.length ? `features: ${features.join(', ')}` : 'default plugin'})`
 		)
+		return installedPlugins
 	} catch (error) {
-		// installSpinner.fail('Plugins installation failed.')
 		console.error('Error installing Bless plugins:', error)
 		process.exit(1)
 	}
@@ -271,17 +263,12 @@ async function runBuildCommand(
 		buildSpinner.succeed('JS build successful.')
 
 		await installJavy(JAVY_PATH, update)
-		await installJavyBlessPlugins(PLUGINS_PATH, features, update)
+		const pluginPaths = await installJavyBlessPlugins(
+			PLUGINS_DIR,
+			features,
+			update
+		)
 
-		let pluginPaths: string[] = []
-		if (existsSync(PLUGINS_DIR)) {
-			const pluginFiles = fs.readdirSync(PLUGINS_DIR)
-			pluginPaths = pluginFiles
-				.filter((file) => file.endsWith('.wasm'))
-				.map((file) => path.resolve(PLUGINS_DIR, file))
-		}
-
-		// Compile to WebAssembly
 		const pluginSpinner = ora('Loading WASM plugins ...').start()
 		const javySpinner = ora('Building WASM ...').start()
 		try {
@@ -289,19 +276,24 @@ async function runBuildCommand(
 				.map((plugin) => `-C plugin=${plugin}`)
 				.join(' ')
 			pluginSpinner.succeed(`WASM plugins loaded [${pluginPaths.length}]`)
-			execSync(
-				`${JAVY_PATH} build ${pluginArgs} ${path.resolve(
-					outPath,
-					'index.js'
-				)} -o ${path.resolve(outPath, outFile ? outFile : 'index.wasm')}`
-			)
+			const command = `${JAVY_PATH} build ${pluginArgs} ${path.resolve(
+        outPath,
+        'index.js'
+      )} -o ${path.resolve(outPath, outFile ? outFile : 'index.wasm')}`
+      
+      console.log('\nExecuting command:')
+      console.log(command, '\n')
+      
+      execSync(command)
 			javySpinner.succeed('WASM build successful.')
 		} catch (error) {
 			javySpinner.fail('WASM build failed.')
+			throw error
 		}
 	} catch (error) {
 		buildSpinner.fail('Build failed.')
 		console.error(error)
+		process.exit(1)
 	}
 
 	// Clean Up: Delete index.js file
