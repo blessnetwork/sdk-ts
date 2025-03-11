@@ -85,8 +85,11 @@ class WebServer {
 	public setStatics(assetsJson: { [key: string]: string }) {
 		this.staticFiles = assetsJson
 	}
-	public statics(prefix: string, directory: string) {
-		const normalizedPrefix = prefix.startsWith('/') ? prefix : `/${prefix}`
+	public statics(directory: string, prefix?: string) {
+		const effectivePrefix = prefix || '/'
+		const normalizedPrefix = effectivePrefix.startsWith('/')
+			? effectivePrefix
+			: `/${effectivePrefix}`
 		this.staticPaths.push({ prefix: normalizedPrefix, directory })
 	}
 	public start() {
