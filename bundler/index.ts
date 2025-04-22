@@ -11,6 +11,7 @@ import { hideBin } from 'yargs/helpers'
 import * as esbuild from 'esbuild'
 import { execSync } from 'child_process'
 import { existsSync, mkdirSync, unlinkSync } from 'fs'
+import { version } from "detect-libc"
 import ora from 'ora'
 
 // Get operating system information
@@ -139,10 +140,19 @@ async function installJavy(
 			'arm64-darwin': 'arm-macos'
 		}
 
-		const binArch =
+		let binArch =
 			platform === 'win32'
 				? 'x86_64-windows'
 				: supportedArchitectures[`${arch}-${platform}`] || 'x86_64-linux' // Default to x86_64-linux if not found
+		if (platform == "linux" && arch == "x64") {
+			const v = await version()
+			if (v) {
+				const [major, minor, patch] = v.split('.');
+				if (major == "2" && (minor == "31")) {
+					binArch = 'x86_64-linux-glibc2.31'
+				}
+			}
+		}		
 		const binFilename = `javy-${binArch}`
 
 		// Fetch the latest release information for bls-javy
