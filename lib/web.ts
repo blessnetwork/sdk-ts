@@ -9,7 +9,8 @@ interface Route {
 interface Request {
 	params?: { [key: string]: string }
 	query?: { [key: string]: string }
-	body?: { [key: string]: unknown }
+	body?: string
+	method?: string
 }
 
 interface Response {
@@ -43,8 +44,9 @@ class WebServer {
 		return (this.staticFiles[urlPath] as string) || null
 	}
 	private setupStdinListener() {
-		const input: InputProps<{ method: string; path: string }> = readInput()
-		const { method, path: urlPath } = input.args
+		const input: InputProps<{ method: string; path: string; body: string }> =
+			readInput()
+		const { method, path: urlPath, body } = input.args
 		if (method === 'GET') {
 			const staticContent = this.serveStaticFile(urlPath)
 			if (staticContent !== null) {
@@ -58,7 +60,10 @@ class WebServer {
 		})
 		if (route) {
 			const { params } = this.matchRoute(route.path, urlPath)
-			route.handler({ params }, { send: (msg: string) => console.log(msg) })
+			route.handler(
+				{ params, method, body },
+				{ send: (msg: string) => console.log(msg) }
+			)
 		} else {
 			// serve index.html or index.htm if the route is '/'
 			if (urlPath === '/' || urlPath === '') {
