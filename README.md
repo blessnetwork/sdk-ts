@@ -10,10 +10,10 @@ npx blessnet init
 
 ## The SDK natively supports
 
-- json
-- http
-- crypto
-
+- `json`
+- `http`
+- `crypto`
+- `llm`
 
 ## Install this SDK
 
