@@ -5,7 +5,9 @@
   "private": true,
   "scripts": {
     "build": "bls-sdk-ts build ./index.ts",
-    "invoke": "bls-runtime ./build/index.wasm"
+    "build:mcp": "bls-sdk-ts build ./mcp.ts",
+    "invoke": "bls-runtime ./build/index.wasm",
+    "invoke:mcp": "bls-runtime ./build/mcp.wasm"
   },
   "devDependencies": {
     "@blockless/sdk-ts": "file:../.."
