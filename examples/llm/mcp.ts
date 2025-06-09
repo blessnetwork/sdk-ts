@@ -1,3 +1,5 @@
+import { BlessLLM } from '@blockless/sdk-ts'
+
 // Create instance
 const llm = BlessLLM("Llama-3.1-8B-Instruct-q4f16_1-MLC");
 
