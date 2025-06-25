@@ -9,13 +9,11 @@ export async function main<T extends object>(cb: EntryCallback<T> | EntryCallbac
 	if (isPromiseCallback(cb)) {
 		const result = await cb()
 		writeOutput(result)
-
 		return result
 	}
 
 	const result = cb()
 	writeOutput(result)
-
 	return result
 }
 
