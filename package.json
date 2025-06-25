@@ -2,6 +2,7 @@
 	"name": "@blockless/sdk-ts",
 	"version": "1.1.0",
 	"type": "module",
+	"main": "dist/lib/index.js",
 	"module": "dist/lib/index.js",
 	"types": "dist/lib/index.d.ts",
 	"bin": {
@@ -35,6 +36,7 @@
 		"node-fetch": "^3.3.2",
 		"node-gzip": "^1.1.2",
 		"ora": "^8.0.1",
-		"yargs": "^17.7.2"
+		"yargs": "^17.7.2",
+		"zod": "^3.25.67"
 	}
 }
