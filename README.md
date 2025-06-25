@@ -14,6 +14,7 @@ npx blessnet init
 - `http`
 - `crypto`
 - `llm`
+- `bless-crawl`
 
 ## Install this SDK
 
