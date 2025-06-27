@@ -16,13 +16,6 @@ async function testScraping() {
     timeout: 30000
   });
 
-  console.log(`Runtime mode: ${crawler.runtimeMode}`);
-  
-  if (crawler.runtimeMode === 'http') {
-    console.log(`Endpoint URL: ${crawler.endpoint_url}`);
-    console.log(`Function ID: ${crawler.function_id}`);
-  }
-
   try {
     console.log('Scraping example.com...');
     const result = await crawler.scrape('https://example.com', {

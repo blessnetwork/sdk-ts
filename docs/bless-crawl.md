@@ -209,15 +209,3 @@ result.links.forEach(link => {
   console.log(`${link.url} (${link.link_type})`)
 })
 ```
-
-### HTML to Markdown Utility
-
-```typescript
-// Available immediately - uses existing functionality
-const html = '<h1>Title</h1><p>Content with <strong>bold</strong> text.</p>'
-const markdown = blessCrawl.htmlToMarkdown(html)
-console.log(markdown)
-// Output: # Title
-//         
-//         Content with **bold** text.
-```
