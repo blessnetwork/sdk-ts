@@ -2,9 +2,6 @@
  * BlessCrawl - Distributed Web Scraping SDK for TypeScript
  * 
  * Provides distributed web scraping across the BLESS network's browser nodes.
- * Can run in two modes:
- * 1. WASM Runtime Mode: Uses globalThis.BlessCrawl when available (QuickJS WASM)
- * 2. HTTP Mode: Makes HTTP requests to WASM function when running in Node.js/browser
  * 
  * @example
  * ```typescript
@@ -205,48 +202,6 @@ export class BlessCrawlValidationError extends BlessCrawlError {
   }
 }
 
-/**
- * Configuration for creating a BlessCrawl instance
- */
-export interface BlessCrawlConfig extends ScrapeOptions {
-  /** WASM function execution endpoint URL (for HTTP mode) */
-  endpoint_url?: string;
-  /** WASM function ID (for HTTP mode) */
-  function_id?: string;
-}
-
-/**
- * Input format for stdin-based operations (HTTP mode)
- */
-interface StdinInput {
-  /** The operation to perform: scrape, map, or crawl */
-  operation: 'scrape' | 'map' | 'crawl';
-  /** The target URL to process */
-  url: string;
-  /** Configuration object specific to the operation */
-  config?: ScrapeOptions | (MapOptions & Partial<ScrapeOptions>) | (CrawlOptions & Partial<ScrapeOptions>);
-}
-
-/**
- * Output format from stdin-based operations (HTTP mode)
- */
-interface StdinOutput {
-  /** Whether the operation was successful */
-  success: boolean;
-  /** The operation that was performed */
-  operation: string;
-  /** The URL that was processed */
-  url: string;
-  /** The result data if successful */
-  data?: ScrapeData | MapData | CrawlData;
-  /** Error information if the operation failed */
-  error?: {
-    message: string;
-    code?: string;
-    details?: unknown;
-  };
-}
-
 // Declare the global BlessCrawl class injected by the runtime
 declare global {
   var BlessCrawl: {
@@ -285,51 +240,21 @@ declare global {
  * ```
  */
 export class BlessCrawl {
-  public readonly BLESS_ENDPOINT_URL: string = 'http://localhost:8081/api/v1/functions/execute';
-  public readonly BLESS_FUNCTION_ID: string = 'bafybeibng4fppjveq7bsf3lcj7pahcn3353dkt4utmnzm63majnkq6dzkm';
-
-  /** Default timeout in milliseconds (15 seconds) */
-  public static readonly DEFAULT_TIMEOUT_MS = 15000;
-  /** Default wait time in milliseconds (3 seconds) */
-  public static readonly DEFAULT_WAIT_TIME_MS = 3000;
-  /** Maximum timeout in milliseconds (2 minutes) */
-  public static readonly MAX_TIMEOUT_MS = 120000;
-  /** Maximum wait time in milliseconds (20 seconds) */
-  public static readonly MAX_WAIT_TIME_MS = 20000;
-
   private _instance?: InstanceType<typeof globalThis.BlessCrawl>;
-  private _config: BlessCrawlConfig;
-  private _isWasmMode: boolean;
-  public readonly endpoint_url: string;
-  public readonly function_id: string;
 
   /**
    * Creates a new BlessCrawl instance
    * @param config Optional configuration for the scraper
    */
-  constructor(config: BlessCrawlConfig = {}) {
-    // Check if we're in WASM runtime mode
-    this._isWasmMode = typeof globalThis.BlessCrawl === 'function';
-
-    // Validate and store config
+  constructor(config: ScrapeOptions = {}) {
     const validatedConfig = this.validateConfig(config);
-    this._config = validatedConfig;
-
-    // Configure HTTP mode settings; priority: config > process.env > defaults
-    this.endpoint_url = config.endpoint_url || (typeof process !== 'undefined' && process.env?.BLESS_ENDPOINT_URL) || this.BLESS_ENDPOINT_URL;
-    this.function_id = config.function_id || (typeof process !== 'undefined' && process.env?.BLESS_FUNCTION_ID) || this.BLESS_FUNCTION_ID;
-
-    if (this._isWasmMode) {
-      // Create the underlying instance using the global BlessCrawl
-      this._instance = new globalThis.BlessCrawl(validatedConfig);
-    }
-    // In HTTP mode, we don't need to create an instance
+    this._instance = new globalThis.BlessCrawl(validatedConfig);
   }
 
   /**
    * Validates configuration using Zod schema
    */
-  private validateConfig(config: unknown): BlessCrawlConfig {
+  private validateConfig(config: unknown): ScrapeOptions {
     try {
       return ScrapeOptionsSchema.extend({
         endpoint_url: z.string().optional(),
@@ -402,140 +327,6 @@ export class BlessCrawl {
   }
 
   /**
-   * Makes an HTTP request to the WASM function endpoint
-   */
-  private async makeHttpRequest<T>(operation: 'scrape' | 'map' | 'crawl', url: string, config: any): Promise<T> {
-    const stdinInput: StdinInput = { operation, url, config };
-
-    const requestBody = {
-      function_id: this.function_id,
-      method: "blessnet.wasm",
-      config: {
-        permissions: [url],
-        stdin: JSON.stringify(stdinInput)
-      }
-    };
-
-    try {
-      const response = await fetch(this.endpoint_url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) {
-        throw new BlessCrawlError(`HTTP request failed with status ${response.status}: ${response.statusText}`, 'HTTP_ERROR');
-      }
-
-      const httpResult = await response.json();
-
-      // Validate outer response structure
-      if (!httpResult || typeof httpResult !== 'object') {
-        throw new BlessCrawlError('Invalid response format: expected JSON object', 'RESPONSE_FORMAT_ERROR');
-      }
-
-      // Check outer response code
-      if (httpResult.code !== "200") {
-        throw new BlessCrawlError(
-          `Function execution failed with code ${httpResult.code}`,
-          'FUNCTION_EXECUTION_ERROR',
-          httpResult
-        );
-      }
-
-      // Validate results array exists
-      if (!httpResult.results || !Array.isArray(httpResult.results) || httpResult.results.length === 0) {
-        throw new BlessCrawlError(
-          'No results returned from function execution',
-          'NO_RESULTS_ERROR',
-          httpResult
-        );
-      }
-
-      const firstResult = httpResult.results[0];
-
-      // Validate result structure
-      if (!firstResult || !firstResult.result) {
-        throw new BlessCrawlError(
-          'Invalid result structure: missing result field',
-          'RESULT_FORMAT_ERROR',
-          firstResult
-        );
-      }
-
-      // Check exit code
-      if (firstResult.result.exit_code !== 0) {
-        const stderr = firstResult.result.stderr || 'No error details available';
-        throw new BlessCrawlError(
-          `Function execution failed with exit code ${firstResult.result.exit_code}: ${stderr}`,
-          'FUNCTION_EXIT_ERROR',
-          firstResult.result
-        );
-      }
-
-      // Parse stdout as JSON
-      const stdout = firstResult.result.stdout;
-      if (!stdout || typeof stdout !== 'string') {
-        throw new BlessCrawlError(
-          'Invalid stdout: expected non-empty string',
-          'STDOUT_FORMAT_ERROR',
-          firstResult.result
-        );
-      }
-
-      let stdinOutput: StdinOutput;
-      try {
-        stdinOutput = JSON.parse(stdout);
-      } catch (parseError) {
-        throw new BlessCrawlError(
-          `Failed to parse stdout as JSON: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`,
-          'STDOUT_PARSE_ERROR',
-          { stdout, parseError }
-        );
-      }
-
-      // Validate StdinOutput structure
-      if (!stdinOutput || typeof stdinOutput !== 'object') {
-        throw new BlessCrawlError(
-          'Invalid StdinOutput format: expected JSON object',
-          'STDIN_OUTPUT_FORMAT_ERROR',
-          stdinOutput
-        );
-      }
-
-      // Check operation success
-      if (!stdinOutput.success) {
-        throw new BlessCrawlError(
-          stdinOutput.error?.message || 'Operation failed',
-          stdinOutput.error?.code || 'OPERATION_ERROR',
-          stdinOutput.error?.details
-        );
-      }
-
-      // Validate data field exists
-      if (!stdinOutput.data) {
-        throw new BlessCrawlError(
-          'No data returned from successful operation',
-          'NO_DATA_ERROR',
-          stdinOutput
-        );
-      }
-      return stdinOutput.data as T;
-    } catch (error) {
-      if (error instanceof BlessCrawlError) {
-        throw error;
-      }
-      throw new BlessCrawlError(
-        `Failed to make HTTP request: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'HTTP_ERROR',
-        error
-      );
-    }
-  }
-
-  /**
    * Scrapes webpage content and returns it as markdown with metadata
    * 
    * @param url The URL to scrape
@@ -558,17 +349,12 @@ export class BlessCrawl {
 
     const validatedOptions = this.validateScrapeOptions(options);
 
-    if (this._isWasmMode && this._instance) {
-      try {
-        return await this._instance.scrape(url, validatedOptions);
-      } catch (error) {
-        throw new BlessCrawlError(
-          error instanceof Error ? error.message : 'Unknown error during scrape operation'
-        );
-      }
-    } else {
-      // HTTP mode
-      return await this.makeHttpRequest<ScrapeData>('scrape', url, validatedOptions);
+    try {
+      return await this._instance!.scrape(url, validatedOptions);
+    } catch (error) {
+      throw new BlessCrawlError(
+        error instanceof Error ? error.message : 'Unknown error during scrape operation'
+      );
     }
   }
 
@@ -605,17 +391,12 @@ export class BlessCrawl {
       ...validatedMapOptions
     };
 
-    if (this._isWasmMode && this._instance) {
-      try {
-        return await this._instance.map(url, combinedOptions);
-      } catch (error) {
-        throw new BlessCrawlError(
-          error instanceof Error ? error.message : 'Unknown error during map operation'
-        );
-      }
-    } else {
-      // HTTP mode
-      return await this.makeHttpRequest<MapData>('map', url, combinedOptions);
+    try {
+      return await this._instance!.map(url, combinedOptions);
+    } catch (error) {
+      throw new BlessCrawlError(
+        error instanceof Error ? error.message : 'Unknown error during map operation'
+      );
     }
   }
 
@@ -672,26 +453,13 @@ export class BlessCrawl {
       ...validatedCrawlOptions
     };
 
-    if (this._isWasmMode && this._instance) {
-      try {
-        return await this._instance.crawl(url, combinedOptions);
-      } catch (error) {
-        throw new BlessCrawlError(
-          error instanceof Error ? error.message : 'Unknown error during crawl operation'
-        );
-      }
-    } else {
-      // HTTP mode
-      return await this.makeHttpRequest<CrawlData>('crawl', url, combinedOptions);
+    try {
+      return await this._instance!.crawl(url, combinedOptions);
+    } catch (error) {
+      throw new BlessCrawlError(
+        error instanceof Error ? error.message : 'Unknown error during crawl operation'
+      );
     }
-  }
-
-  /**
-   * Gets the current runtime mode
-   * @returns Whether the SDK is running in WASM mode or HTTP mode
-   */
-  public get runtimeMode(): 'wasm' | 'http' {
-    return this._isWasmMode ? 'wasm' : 'http';
   }
 }
 
