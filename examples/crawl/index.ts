@@ -1,12 +1,5 @@
-/**
- * BlessCrawl Mode Test - Demonstrates both WASM and HTTP execution
- * 
- * This example shows how the BlessCrawl SDK automatically detects the runtime and uses either:
- * 1. Native WASM calls when globalThis.BlessCrawl is available
- * 2. HTTP requests to the WASM function when running in Node.js/browser
- */
-
-import { BlessCrawl, BlessCrawlError } from '@blockless/sdk-ts'
+// import { BlessCrawl, BlessCrawlError } from '@blockless/sdk-ts'
+import { BlessCrawl, BlessCrawlError } from '../../../bless-crawl'
 
 async function testScraping() {
   console.log('\n=== Testing SDK - Scraping ===');
