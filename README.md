@@ -56,6 +56,12 @@ entryMain(async (input: InputProps<Arguments>) => {
 
 ### Building examples locally
 
+#### Building fetch example
+
+```sh
+npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build -f fetch-example.wasm --features fetch
+```
+
 #### Building the LLM example
 
 ```sh
@@ -68,13 +74,36 @@ npm run build && node ./dist/bundler build ./examples/llm/index.ts -o ./build -f
 npm run build && node ./dist/bundler build ./examples/crawl/index.ts -o ./build -f crawl-example.wasm --features crawl
 ```
 
-### Re-install/update Javy and plugins
+### Plugin Version Management
+
+#### Default behavior (pinned version)
+By default, builds use a pinned version of the Bless plugins for consistency:
+
+```sh
+npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build -f fetch-example.wasm
+```
+
+#### Update to latest version
+Use `--update` to fetch and install the latest plugin version:
 
 ```sh
 npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build -f fetch-example.wasm --update
 ```
 
-Note: `--update` will force the re-installation of Javy and the plugins - getting the latest versions.
+#### Use specific version
+You can specify a particular plugin version by providing it as a value to the `--update` flag:
+
+```sh
+# Version with 'v' prefix
+npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build -f fetch-example.wasm --update v0.2.3
+
+# Version without 'v' prefix (will be normalized)
+npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build -f fetch-example.wasm --update 0.2.3
+```
+
+Note: The `--update` flag will force the re-installation of Javy and the plugins.
+When used without a value, it fetches the latest versions.
+When provided with a version, it will install that specific version.
 
 ## Uninstall Javy and plugins
 
