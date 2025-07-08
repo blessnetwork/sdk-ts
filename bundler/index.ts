@@ -26,7 +26,7 @@ const JAVY_PATH = path.resolve(
 )
 const PLUGINS_DIR = path.resolve(BLESSNET_BASE, 'bin', 'plugins')
 
-const SUPPORTED_FEATURES = ['full', 'llm', 'crypto', 'fetch'] as const
+const SUPPORTED_FEATURES = ['full', 'llm', 'crypto', 'fetch', 'crawl', 'wasip1'] as const
 type SupportedFeature = (typeof SUPPORTED_FEATURES)[number]
 
 // Initialize the CLI
