@@ -26,6 +26,9 @@ const JAVY_PATH = path.resolve(
 )
 const PLUGINS_DIR = path.resolve(BLESSNET_BASE, 'bin', 'plugins')
 
+// https://github.com/blessnetwork/javy-bless-plugins/releases
+const DEFAULT_JAVY_BLESS_PLUGINS_VERSION = 'v0.2.3'
+
 const SUPPORTED_FEATURES = ['full', 'llm', 'crypto', 'fetch', 'crawl', 'wasip1'] as const
 type SupportedFeature = (typeof SUPPORTED_FEATURES)[number]
 
@@ -74,8 +77,8 @@ yargs(hideBin(process.argv))
 				})
 				.option('update', {
 					alias: 'r',
-					describe: 'Force update of Javy and bless plugins',
-					type: 'boolean',
+					describe: 'Force update of Javy and bless plugins. Optionally specify version (e.g., 0.2.3 or v0.2.3)',
+					type: 'string',
 					default: false
 				})
 				.group(['out-dir'], 'Options:')
@@ -87,7 +90,7 @@ yargs(hideBin(process.argv))
 					argv.outDir,
 					argv.outFile,
 					argv.features || [],
-					argv.update
+					argv.update as string | false
 				)
 			} catch (error) {
 				console.error('Error:', error)
@@ -186,27 +189,30 @@ async function installJavy(
 async function installJavyBlessPlugins(
 	pluginsDir: string,
 	features: SupportedFeature[],
-	forceUpdate: boolean
+	forceUpdate: boolean,
+	version?: string
 ): Promise<string[]> {
 	try {
-		const { tag_name: latestTag } = await fetch(
+		// Use provided version or fetch latest if not specified
+		const targetVersion = version || await fetch(
 			'https://api.github.com/repos/blessnetwork/javy-bless-plugins/releases/latest'
-		).then((res) => res.json() as Promise<{ tag_name: string }>)
+		).then((res) => res.json() as Promise<{ tag_name: string }>).then(data => data.tag_name)
 
 		if (!existsSync(pluginsDir)) {
 			fs.mkdirSync(pluginsDir, { recursive: true })
 		}
 
-		const installSpinner = ora('Installing Bless plugins ...').start()
+		console.log(`Target plugin version: ${targetVersion}`)
+		const installSpinner = ora(`Installing Bless plugins (${targetVersion})...`).start()
 		const pluginsToInstall = features.length === 0 ? [''] : features
 		const installedPlugins: string[] = []
 
 		for (const feature of pluginsToInstall) {
 			const pluginName = feature
-				? `bless-plugins-${feature}-${latestTag}.wasm`
-				: `bless-plugins-${latestTag}.wasm`
+				? `bless-plugins-${feature}-${targetVersion}.wasm`
+				: `bless-plugins-${targetVersion}.wasm`
 			const pluginPath = path.join(pluginsDir, pluginName)
-			const pluginUrl = `https://github.com/blessnetwork/javy-bless-plugins/releases/download/${latestTag}/${pluginName}`
+			const pluginUrl = `https://github.com/blessnetwork/javy-bless-plugins/releases/download/${targetVersion}/${pluginName}`
 
 			if (!existsSync(pluginPath) || forceUpdate) {
 				if (existsSync(pluginPath)) unlinkSync(pluginPath)
@@ -224,7 +230,7 @@ async function installJavyBlessPlugins(
 		}
 
 		installSpinner.succeed(
-			`Plugins installation successful (${features.length ? `features: ${features.join(', ')}` : 'default plugin'})`
+			`Plugins installation successful (${targetVersion}, ${features.length ? `features: ${features.join(', ')}` : 'default plugin'})`
 		)
 		return installedPlugins
 	} catch (error) {
@@ -238,7 +244,7 @@ async function runBuildCommand(
 	outDir: string | undefined,
 	outFile: string | undefined,
 	features: SupportedFeature[],
-	update: boolean
+	update: string | false
 ) {
 	// Validate input path
 	if (!existsSync(entry)) {
@@ -272,11 +278,28 @@ async function runBuildCommand(
 		})
 		buildSpinner.succeed('JS build successful.')
 
-		await installJavy(JAVY_PATH, update)
+		await installJavy(JAVY_PATH, !!update)
+		// Determine which version to use:
+		// 1. If update is a string (specific version), use it (normalize by adding 'v' prefix if needed)
+		// 2. If update is true (without specific version), fetch latest
+		// 3. Otherwise, use the default pinned version
+		let versionToUse: string | undefined
+		if (typeof update === 'string') {
+			// Normalize version format (add 'v' prefix if not present)
+			versionToUse = update.startsWith('v') ? update : `v${update}`
+		} else if (update) {
+			// update flag without specific version means get latest
+			versionToUse = undefined // will fetch latest in installJavyBlessPlugins
+		} else {
+			// default behavior: use pinned version
+			versionToUse = DEFAULT_JAVY_BLESS_PLUGINS_VERSION
+		}
+
 		const pluginPaths = await installJavyBlessPlugins(
 			PLUGINS_DIR,
 			features,
-			update
+			!!update,
+			versionToUse
 		)
 
 		const pluginSpinner = ora('Loading WASM plugins ...').start()
