@@ -29,9 +29,6 @@ const PLUGINS_DIR = path.resolve(BLESSNET_BASE, 'bin', 'plugins')
 // https://github.com/blessnetwork/javy-bless-plugins/releases
 const DEFAULT_JAVY_BLESS_PLUGINS_VERSION = 'v0.2.3'
 
-const SUPPORTED_FEATURES = ['full', 'llm', 'crypto', 'fetch', 'crawl', 'wasip1'] as const
-type SupportedFeature = (typeof SUPPORTED_FEATURES)[number]
-
 // Initialize the CLI
 yargs(hideBin(process.argv))
 	.scriptName('bls-sdk-ts')
@@ -57,24 +54,6 @@ yargs(hideBin(process.argv))
 					type: 'string',
 					default: 'index.wasm'
 				})
-				.option('features', {
-					alias: 'F',
-					describe: `Comma-separated list of features to enable. Supported features: [${SUPPORTED_FEATURES.join(', ')}]`,
-					type: 'string',
-					coerce: (arg: string) => {
-						if (!arg) return []
-						const features = arg.split(',').map((f) => f.trim().toLowerCase())
-						const invalidFeatures = features.filter(
-							(f) => !SUPPORTED_FEATURES.includes(f as SupportedFeature)
-						)
-						if (invalidFeatures.length > 0) {
-							throw new Error(
-								`Unsupported features: ${invalidFeatures.join(', ')}`
-							)
-						}
-						return features as SupportedFeature[]
-					}
-				})
 				.option('update', {
 					alias: 'r',
 					describe: 'Force update of Javy and bless plugins. Optionally specify version (e.g., 0.2.3 or v0.2.3)',
@@ -89,7 +68,6 @@ yargs(hideBin(process.argv))
 					argv.path,
 					argv.outDir,
 					argv.outFile,
-					argv.features || [],
 					argv.update as string | false
 				)
 			} catch (error) {
@@ -188,7 +166,6 @@ async function installJavy(
 
 async function installJavyBlessPlugins(
 	pluginsDir: string,
-	features: SupportedFeature[],
 	forceUpdate: boolean,
 	version?: string
 ): Promise<string[]> {
@@ -204,33 +181,29 @@ async function installJavyBlessPlugins(
 
 		console.log(`Target plugin version: ${targetVersion}`)
 		const installSpinner = ora(`Installing Bless plugins (${targetVersion})...`).start()
-		const pluginsToInstall = features.length === 0 ? [''] : features
 		const installedPlugins: string[] = []
 
-		for (const feature of pluginsToInstall) {
-			const pluginName = feature
-				? `bless-plugins-${feature}-${targetVersion}.wasm`
-				: `bless-plugins-${targetVersion}.wasm`
-			const pluginPath = path.join(pluginsDir, pluginName)
-			const pluginUrl = `https://github.com/blessnetwork/javy-bless-plugins/releases/download/${targetVersion}/${pluginName}`
+		const pluginName = `bless-plugins-${targetVersion}.wasm`
+		const pluginPath = path.join(pluginsDir, pluginName)
+		const pluginUrl = `https://github.com/blessnetwork/javy-bless-plugins/releases/download/${targetVersion}/${pluginName}`
 
-			if (!existsSync(pluginPath) || forceUpdate) {
-				if (existsSync(pluginPath)) unlinkSync(pluginPath)
+		if (!existsSync(pluginPath) || forceUpdate) {
+			if (existsSync(pluginPath)) unlinkSync(pluginPath)
 
-				const response = await fetch(pluginUrl)
-				if (!response.ok) {
-					throw new Error(
-						`Failed to download ${feature || 'default'} plugin: ${response.statusText}`
-					)
-				}
-
-				fs.writeFileSync(pluginPath, Buffer.from(await response.arrayBuffer()))
+			const response = await fetch(pluginUrl)
+			if (!response.ok) {
+				throw new Error(
+					`Failed to download plugin: ${response.statusText}`
+				)
 			}
-			installedPlugins.push(pluginPath)
+
+			fs.writeFileSync(pluginPath, Buffer.from(await response.arrayBuffer()))
 		}
 
+		installedPlugins.push(pluginPath)
+
 		installSpinner.succeed(
-			`Plugins installation successful (${targetVersion}, ${features.length ? `features: ${features.join(', ')}` : 'default plugin'})`
+			`Plugins installation successful (${targetVersion})`
 		)
 		return installedPlugins
 	} catch (error) {
@@ -243,7 +216,6 @@ async function runBuildCommand(
 	entry: string,
 	outDir: string | undefined,
 	outFile: string | undefined,
-	features: SupportedFeature[],
 	update: string | false
 ) {
 	// Validate input path
@@ -297,7 +269,6 @@ async function runBuildCommand(
 
 		const pluginPaths = await installJavyBlessPlugins(
 			PLUGINS_DIR,
-			features,
 			!!update,
 			versionToUse
 		)
