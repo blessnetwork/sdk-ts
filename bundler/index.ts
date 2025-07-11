@@ -57,18 +57,30 @@ yargs(hideBin(process.argv))
 				.option('update', {
 					alias: 'r',
 					describe: 'Force update of Javy and bless plugins. Optionally specify version (e.g., 0.2.3 or v0.2.3)',
-					type: 'string',
-					default: false
+					type: 'string'
 				})
+				.option('custom-plugin', {
+					alias: 'c',
+					describe: 'Path to custom bless plugin .wasm file',
+					type: 'string'
+				})
+				.conflicts('custom-plugin', 'update')
 				.group(['out-dir'], 'Options:')
 		},
 		async (argv) => {
 			try {
+				// Additional validation for mutual exclusion
+				if (argv.customPlugin && argv.update) {
+					console.error('Error: Cannot use --custom-plugin (-c) and --update (-r) together. Custom plugins don\'t require version management.')
+					process.exit(1)
+				}
+				
 				await runBuildCommand(
 					argv.path,
 					argv.outDir,
 					argv.outFile,
-					argv.update as string | false
+					argv.update as string | undefined,
+					argv.customPlugin as string | undefined
 				)
 			} catch (error) {
 				console.error('Error:', error)
@@ -164,6 +176,26 @@ async function installJavy(
 	}
 }
 
+async function getDefaultPlugins(update: string | undefined): Promise<string[]> {
+	// Determine which version to use:
+	// 1. If update is a string (specific version), use it (normalize by adding 'v' prefix if needed)
+	// 2. Otherwise, use the default pinned version
+	let versionToUse: string | undefined
+	if (typeof update === 'string') {
+		// Normalize version format (add 'v' prefix if not present)
+		versionToUse = update.startsWith('v') ? update : `v${update}`
+	} else {
+		// default behavior: use pinned version
+		versionToUse = DEFAULT_JAVY_BLESS_PLUGINS_VERSION
+	}
+
+	return await installJavyBlessPlugins(
+		PLUGINS_DIR,
+		!!update,
+		versionToUse
+	)
+}
+
 async function installJavyBlessPlugins(
 	pluginsDir: string,
 	forceUpdate: boolean,
@@ -216,7 +248,8 @@ async function runBuildCommand(
 	entry: string,
 	outDir: string | undefined,
 	outFile: string | undefined,
-	update: string | false
+	update: string | undefined,
+	customPluginPath?: string
 ) {
 	// Validate input path
 	if (!existsSync(entry)) {
@@ -251,27 +284,21 @@ async function runBuildCommand(
 		buildSpinner.succeed('JS build successful.')
 
 		await installJavy(JAVY_PATH, !!update)
-		// Determine which version to use:
-		// 1. If update is a string (specific version), use it (normalize by adding 'v' prefix if needed)
-		// 2. If update is true (without specific version), fetch latest
-		// 3. Otherwise, use the default pinned version
-		let versionToUse: string | undefined
-		if (typeof update === 'string') {
-			// Normalize version format (add 'v' prefix if not present)
-			versionToUse = update.startsWith('v') ? update : `v${update}`
-		} else if (update) {
-			// update flag without specific version means get latest
-			versionToUse = undefined // will fetch latest in installJavyBlessPlugins
+		
+		// Handle custom plugin path or use default plugins
+		let pluginPaths: string[]
+		if (customPluginPath) {
+			const resolvedCustomPath = path.resolve(customPluginPath)
+			if (existsSync(resolvedCustomPath)) {
+				console.log(`Using custom plugin: ${resolvedCustomPath}`)
+				pluginPaths = [resolvedCustomPath]
+			} else {
+				console.warn(`⚠️  Custom plugin path '${resolvedCustomPath}' does not exist. Falling back to default plugins.`)
+				pluginPaths = await getDefaultPlugins(update)
+			}
 		} else {
-			// default behavior: use pinned version
-			versionToUse = DEFAULT_JAVY_BLESS_PLUGINS_VERSION
+			pluginPaths = await getDefaultPlugins(update)
 		}
-
-		const pluginPaths = await installJavyBlessPlugins(
-			PLUGINS_DIR,
-			!!update,
-			versionToUse
-		)
 
 		const pluginSpinner = ora('Loading WASM plugins ...').start()
 		const javySpinner = ora('Building WASM ...').start()
