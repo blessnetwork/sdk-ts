@@ -84,10 +84,10 @@ npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build 
 ```
 
 #### Update to latest version
-Use `--update` to fetch and install the latest plugin version:
+Use `--update=true` to fetch and install the latest plugin version:
 
 ```sh
-npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build -f fetch-example.wasm --update
+npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build -f fetch-example.wasm --update=true
 ```
 
 #### Use specific version
@@ -95,15 +95,15 @@ You can specify a particular plugin version by providing it as a value to the `-
 
 ```sh
 # Version with 'v' prefix
-npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build -f fetch-example.wasm --update v0.2.3
+npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build -f fetch-example.wasm --update=v0.2.3
 
 # Version without 'v' prefix (will be normalized)
-npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build -f fetch-example.wasm --update 0.2.3
+npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build -f fetch-example.wasm --update=0.2.3
 ```
 
 Note: The `--update` flag will force the re-installation of Javy and the plugins.
-When used without a value, it fetches the latest versions.
 When provided with a version, it will install that specific version.
+When provided with `true`, it will fetch the latest version. When provided with `false`, it will use the pinned version.
 
 ## Uninstall Javy and plugins
 
