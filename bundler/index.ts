@@ -178,9 +178,9 @@ async function installJavy(
 			mode: platform === 'win32' ? '755' : '775'
 		})
 
-		installSpinner.succeed('Installation successful.')
+		installSpinner.succeed('Javy installation successful.')
 	} catch (error) {
-		installSpinner.fail('Installation failed.')
+		installSpinner.fail('Javy installation failed.')
 		console.error('Error installing Javy:', error)
 		process.exit(1)
 	}
