@@ -115,13 +115,17 @@ async function installJavy(
 ): Promise<void> {
 	if (existsSync(javyPath)) {
 		// Skip installation if already installed and force-update is false
-		if (!forceUpdate) return
+		if (!forceUpdate) {
+			const version = execSync(`${javyPath} --version`).toString().trim().split(' ')[1]
+			console.log(`Javy v${version} already installed. Skipping installation.`)
+			return
+		}
 
 		// If force-update is true and file exists, delete it
 		unlinkSync(javyPath)
 	}
 
-	const installSpinner = ora('Installing dependencies ...').start()
+	const installSpinner = ora('Installing Javy...').start()
 
 	try {
 		// Determine the appropriate Javy binary architecture and filename
@@ -168,22 +172,33 @@ async function installJavy(
 			mode: platform === 'win32' ? '755' : '775'
 		})
 
-		installSpinner.succeed('Installation successful.')
+		installSpinner.succeed('Javy installation successful.')
 	} catch (error) {
-		installSpinner.fail('Installation failed.')
+		installSpinner.fail('Javy installation failed.')
 		console.error('Error installing Javy:', error)
 		process.exit(1)
 	}
 }
 
-async function getDefaultPlugins(update: string | undefined): Promise<string[]> {
+async function getDefaultPlugins(update: string | undefined): Promise<{ name: string; path: string }[]> {
 	// Determine which version to use:
 	// 1. If update is a string (specific version), use it (normalize by adding 'v' prefix if needed)
-	// 2. Otherwise, use the default pinned version
+	// 2. If update is true (without specific version), fetch latest
+	// 3. Otherwise, use the default pinned version
 	let versionToUse: string | undefined
 	if (typeof update === 'string') {
-		// Normalize version format (add 'v' prefix if not present)
-		versionToUse = update.startsWith('v') ? update : `v${update}`
+		// check if update is set to true or false
+		if (update === 'true') {
+			versionToUse = undefined
+		} else if (update === 'false') {
+			versionToUse = DEFAULT_JAVY_BLESS_PLUGINS_VERSION
+		} else {
+			// Normalize version format (add 'v' prefix if not present)
+			versionToUse = update.startsWith('v') ? update : `v${update}`
+		}
+	} else if (update) {
+		// update flag without specific version means get latest
+		versionToUse = undefined // will fetch latest in installJavyBlessPlugins
 	} else {
 		// default behavior: use pinned version
 		versionToUse = DEFAULT_JAVY_BLESS_PLUGINS_VERSION
@@ -200,7 +215,7 @@ async function installJavyBlessPlugins(
 	pluginsDir: string,
 	forceUpdate: boolean,
 	version?: string
-): Promise<string[]> {
+): Promise<{ name: string; path: string }[]> {
 	try {
 		// Use provided version or fetch latest if not specified
 		const targetVersion = version || await fetch(
@@ -213,7 +228,7 @@ async function installJavyBlessPlugins(
 
 		console.log(`Target plugin version: ${targetVersion}`)
 		const installSpinner = ora(`Installing Bless plugins (${targetVersion})...`).start()
-		const installedPlugins: string[] = []
+		const installedPlugins: { name: string; path: string }[] = []
 
 		const pluginName = `bless-plugins-${targetVersion}.wasm`
 		const pluginPath = path.join(pluginsDir, pluginName)
@@ -232,7 +247,7 @@ async function installJavyBlessPlugins(
 			fs.writeFileSync(pluginPath, Buffer.from(await response.arrayBuffer()))
 		}
 
-		installedPlugins.push(pluginPath)
+		installedPlugins.push({ name: pluginName, path: pluginPath })
 
 		installSpinner.succeed(
 			`Plugins installation successful (${targetVersion})`
@@ -286,12 +301,12 @@ async function runBuildCommand(
 		await installJavy(JAVY_PATH, !!update)
 		
 		// Handle custom plugin path or use default plugins
-		let pluginPaths: string[]
+		let pluginPaths: { name: string; path: string }[]
 		if (customPluginPath) {
 			const resolvedCustomPath = path.resolve(customPluginPath)
 			if (existsSync(resolvedCustomPath)) {
 				console.log(`Using custom plugin: ${resolvedCustomPath}`)
-				pluginPaths = [resolvedCustomPath]
+				pluginPaths = [{ name: 'custom', path: resolvedCustomPath }]
 			} else {
 				console.warn(`⚠️  Custom plugin path '${resolvedCustomPath}' does not exist. Falling back to default plugins.`)
 				pluginPaths = await getDefaultPlugins(update)
@@ -304,9 +319,9 @@ async function runBuildCommand(
 		const javySpinner = ora('Building WASM ...').start()
 		try {
 			const pluginArgs = pluginPaths
-				.map((plugin) => `-C plugin=${plugin}`)
+				.map((plugin) => `-C plugin=${plugin.path}`)
 				.join(' ')
-			pluginSpinner.succeed(`WASM plugins loaded [${pluginPaths.length}]`)
+			pluginSpinner.succeed(`WASM plugins loaded [${pluginPaths.map((p) => p.name).join(', ')}]`)
 			const command = `${JAVY_PATH} build ${pluginArgs} ${path.resolve(
         outPath,
         'index.js'
