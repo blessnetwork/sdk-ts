@@ -1,4 +1,4 @@
-# @blockless/sdk-ts
+# @blessnetwork/sdk-ts
 
 This sdk is designed to work with Javascript/Typescript and compile for the BLESS Javy WASM Engine. As such this engine does not have full support for Node / Web APIs, but a majority of pure JavaScript will work, including some of those from the `npm` ecosystem.
 
@@ -19,15 +19,15 @@ npx blessnet init
 ## Install this SDK
 
 ```bash
-$ yarn add @blockless/sdk-ts
+$ yarn add @blessnetwork/sdk-ts
 # or using npm
-$ npm i @blockless/sdk-ts
+$ npm i @blessnetwork/sdk-ts
 ```
 
 ## Example of using this SDK.
 
 ```ts
-import { InputProps, entryMain } from '@blockless/sdk-ts'
+import { InputProps, entryMain } from '@blessnetwork/sdk-ts'
 import { AbiCoder } from 'ethers'
 
 interface Arguments {
