@@ -29,9 +29,6 @@ const PLUGINS_DIR = path.resolve(BLESSNET_BASE, 'bin', 'plugins')
 // https://github.com/blessnetwork/javy-bless-plugins/releases
 const DEFAULT_JAVY_BLESS_PLUGINS_VERSION = 'v0.2.3'
 
-const SUPPORTED_FEATURES = ['full', 'llm', 'crypto', 'fetch', 'crawl', 'wasip1'] as const
-type SupportedFeature = (typeof SUPPORTED_FEATURES)[number]
-
 // Initialize the CLI
 yargs(hideBin(process.argv))
 	.scriptName('bls-sdk-ts')
@@ -57,40 +54,33 @@ yargs(hideBin(process.argv))
 					type: 'string',
 					default: 'index.wasm'
 				})
-				.option('features', {
-					alias: 'F',
-					describe: `Comma-separated list of features to enable. Supported features: [${SUPPORTED_FEATURES.join(', ')}]`,
-					type: 'string',
-					coerce: (arg: string) => {
-						if (!arg) return []
-						const features = arg.split(',').map((f) => f.trim().toLowerCase())
-						const invalidFeatures = features.filter(
-							(f) => !SUPPORTED_FEATURES.includes(f as SupportedFeature)
-						)
-						if (invalidFeatures.length > 0) {
-							throw new Error(
-								`Unsupported features: ${invalidFeatures.join(', ')}`
-							)
-						}
-						return features as SupportedFeature[]
-					}
-				})
 				.option('update', {
 					alias: 'r',
 					describe: 'Force update of Javy and bless plugins. Optionally specify version (e.g., 0.2.3 or v0.2.3)',
-					type: 'string',
-					default: false
+					type: 'string'
 				})
+				.option('custom-plugin', {
+					alias: 'c',
+					describe: 'Path to custom bless plugin .wasm file',
+					type: 'string'
+				})
+				.conflicts('custom-plugin', 'update')
 				.group(['out-dir'], 'Options:')
 		},
 		async (argv) => {
 			try {
+				// Additional validation for mutual exclusion
+				if (argv.customPlugin && argv.update) {
+					console.error('Error: Cannot use --custom-plugin (-c) and --update (-r) together. Custom plugins don\'t require version management.')
+					process.exit(1)
+				}
+				
 				await runBuildCommand(
 					argv.path,
 					argv.outDir,
 					argv.outFile,
-					argv.features || [],
-					argv.update as string | false
+					argv.update as string | undefined,
+					argv.customPlugin as string | undefined
 				)
 			} catch (error) {
 				console.error('Error:', error)
@@ -190,9 +180,39 @@ async function installJavy(
 	}
 }
 
+async function getDefaultPlugins(update: string | undefined): Promise<{ name: string; path: string }[]> {
+	// Determine which version to use:
+	// 1. If update is a string (specific version), use it (normalize by adding 'v' prefix if needed)
+	// 2. If update is true (without specific version), fetch latest
+	// 3. Otherwise, use the default pinned version
+	let versionToUse: string | undefined
+	if (typeof update === 'string') {
+		// check if update is set to true or false
+		if (update === 'true') {
+			versionToUse = undefined
+		} else if (update === 'false') {
+			versionToUse = DEFAULT_JAVY_BLESS_PLUGINS_VERSION
+		} else {
+			// Normalize version format (add 'v' prefix if not present)
+			versionToUse = update.startsWith('v') ? update : `v${update}`
+		}
+	} else if (update) {
+		// update flag without specific version means get latest
+		versionToUse = undefined // will fetch latest in installJavyBlessPlugins
+	} else {
+		// default behavior: use pinned version
+		versionToUse = DEFAULT_JAVY_BLESS_PLUGINS_VERSION
+	}
+
+	return await installJavyBlessPlugins(
+		PLUGINS_DIR,
+		!!update,
+		versionToUse
+	)
+}
+
 async function installJavyBlessPlugins(
 	pluginsDir: string,
-	features: SupportedFeature[],
 	forceUpdate: boolean,
 	version?: string
 ): Promise<{ name: string; path: string }[]> {
@@ -207,36 +227,31 @@ async function installJavyBlessPlugins(
 		}
 
 		console.log(`Target plugin version: ${targetVersion}`)
-		const pluginsToInstall = features.length === 0 ? [''] : features
+		const installSpinner = ora(`Installing Bless plugins (${targetVersion})...`).start()
 		const installedPlugins: { name: string; path: string }[] = []
 
-		for (const feature of pluginsToInstall) {
-			const pluginSpinner = ora(`Installing plugin ${feature}...`).start()
-			const pluginName = feature
-				? `bless-plugins-${feature}-${targetVersion}.wasm`
-				: `bless-plugins-${targetVersion}.wasm`
-			const pluginPath = path.join(pluginsDir, pluginName)
-			const pluginUrl = `https://github.com/blessnetwork/javy-bless-plugins/releases/download/${targetVersion}/${pluginName}`
+		const pluginName = `bless-plugins-${targetVersion}.wasm`
+		const pluginPath = path.join(pluginsDir, pluginName)
+		const pluginUrl = `https://github.com/blessnetwork/javy-bless-plugins/releases/download/${targetVersion}/${pluginName}`
 
-			if (forceUpdate || !existsSync(pluginPath)) {
-				if (existsSync(pluginPath)) {
-					unlinkSync(pluginPath)
-				}
+		if (!existsSync(pluginPath) || forceUpdate) {
+			if (existsSync(pluginPath)) unlinkSync(pluginPath)
 
-				const response = await fetch(pluginUrl)
-				if (!response.ok) {
-					throw new Error(
-						`Failed to download ${feature || 'default'} plugin: ${response.statusText}`
-					)
-				}
-
-				fs.writeFileSync(pluginPath, Buffer.from(await response.arrayBuffer()))
-				pluginSpinner.succeed(`Plugin ${pluginName} installed successfully.`)
-			} else {
-				pluginSpinner.succeed(`Plugin ${pluginName} already installed.`)
+			const response = await fetch(pluginUrl)
+			if (!response.ok) {
+				throw new Error(
+					`Failed to download plugin: ${response.statusText}`
+				)
 			}
-			installedPlugins.push({ name: feature, path: pluginPath })
+
+			fs.writeFileSync(pluginPath, Buffer.from(await response.arrayBuffer()))
 		}
+
+		installedPlugins.push({ name: pluginName, path: pluginPath })
+
+		installSpinner.succeed(
+			`Plugins installation successful (${targetVersion})`
+		)
 		return installedPlugins
 	} catch (error) {
 		console.error('Error installing Bless plugins:', error)
@@ -248,8 +263,8 @@ async function runBuildCommand(
 	entry: string,
 	outDir: string | undefined,
 	outFile: string | undefined,
-	features: SupportedFeature[],
-	update: string | false
+	update: string | undefined,
+	customPluginPath?: string
 ) {
 	// Validate input path
 	if (!existsSync(entry)) {
@@ -284,36 +299,21 @@ async function runBuildCommand(
 		buildSpinner.succeed('JS build successful.')
 
 		await installJavy(JAVY_PATH, !!update)
-
-		// Determine which version to use:
-		// 1. If update is a string (specific version), use it (normalize by adding 'v' prefix if needed)
-		// 2. If update is true (without specific version), fetch latest
-		// 3. Otherwise, use the default pinned version
-		let versionToUse: string | undefined
-		if (typeof update === 'string') {
-			// check if update is set to true or false
-			if (update === 'true') {
-				versionToUse = undefined
-			} else if (update === 'false') {
-				versionToUse = DEFAULT_JAVY_BLESS_PLUGINS_VERSION
+		
+		// Handle custom plugin path or use default plugins
+		let pluginPaths: { name: string; path: string }[]
+		if (customPluginPath) {
+			const resolvedCustomPath = path.resolve(customPluginPath)
+			if (existsSync(resolvedCustomPath)) {
+				console.log(`Using custom plugin: ${resolvedCustomPath}`)
+				pluginPaths = [{ name: 'custom', path: resolvedCustomPath }]
 			} else {
-				// Normalize version format (add 'v' prefix if not present)
-				versionToUse = update.startsWith('v') ? update : `v${update}`
+				console.warn(`⚠️  Custom plugin path '${resolvedCustomPath}' does not exist. Falling back to default plugins.`)
+				pluginPaths = await getDefaultPlugins(update)
 			}
-		} else if (update) {
-			// update flag without specific version means get latest
-			versionToUse = undefined // will fetch latest in installJavyBlessPlugins
 		} else {
-			// default behavior: use pinned version
-			versionToUse = DEFAULT_JAVY_BLESS_PLUGINS_VERSION
+			pluginPaths = await getDefaultPlugins(update)
 		}
-
-		const pluginPaths = await installJavyBlessPlugins(
-			PLUGINS_DIR,
-			features,
-			!!update,
-			versionToUse
-		)
 
 		const pluginSpinner = ora('Loading WASM plugins ...').start()
 		const javySpinner = ora('Building WASM ...').start()
