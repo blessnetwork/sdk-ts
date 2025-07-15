@@ -14,7 +14,6 @@ npx blessnet init
 - `http`
 - `crypto`
 - `llm`
-- `bless-crawl`
 
 ## Install this SDK
 
@@ -68,12 +67,6 @@ npm run build && node ./dist/bundler build ./examples/fetch/index.ts -o ./build 
 npm run build && node ./dist/bundler build ./examples/llm/index.ts -o ./build -f llm-example.wasm --features llm
 ```
 
-#### Building the Bless Crawl example
-
-```sh
-npm run build && node ./dist/bundler build ./examples/crawl/index.ts -o ./build -f crawl-example.wasm --features crawl
-```
-
 ### Plugin Version Management
 
 #### Default behavior (pinned version)
@@ -119,4 +112,3 @@ npm run build && node ./dist/bundler uninstall
 | `llm` | Adds support for the LLM plugin. |
 | `crypto` | Adds support for the Crypto plugin. |
 | `fetch` | Adds support for the Fetch plugin. |
-| `crawl` | Adds support for the Bless Crawl plugin. |
